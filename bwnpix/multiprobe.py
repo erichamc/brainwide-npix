@@ -257,7 +257,7 @@ class MultiprobeEphysExperiment(object):
             spikes_per_cell[i] = [None]*len(event_times)
         # only operate on "good" cells for now (ignore MUA)
         for i,idx in enumerate(cell_ids):
-            spikes_for_clust = self.get_spikes_for_clust(idx)
+            spikes_for_clust = np.sort(self.get_spikes_for_clust(idx))
             for t,s in enumerate(event_times):
                 start,stop = np.searchsorted(spikes_for_clust,[s-rev_t, s+fwd_t])
                 spikes_per_cell[i][t] = spikes_for_clust[start:stop]
