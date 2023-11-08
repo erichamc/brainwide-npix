@@ -9,4 +9,4 @@ Please see notebook files for examples of:
 
 ## Citation
 
-If you use this code, please cite our [paper](https://doi.org/10.1038/s41586-023-06715-z).
+If you use this code, please cite our [paper](https://www.nature.com/articles/s41586-023-06715-z).
