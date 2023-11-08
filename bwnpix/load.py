@@ -143,18 +143,26 @@ class MultiprobeData(object):
         with open(out_path, 'wb') as f:
             pickle.dump(self,f)
 
-    def save_units_npz(self, out_path):
+    def save_units_npz(out_path, self):
         np.savez(out_path, spike_times=self._spike_times, clusts=self._clusts,
             clust_id=self._clust_id, clust_depths=self._clust_depths,
-            probe_id=self._probe_id, tract_names=self._tract_names, 
-            metrics=self._metrics, clust_xpos=self._clust_xpos, 
-            chan_map=self._chan_map, chan_pos=self._chan_pos, winv=self._winv,
-            templates=self._templates, spike_templates=self._spike_templates, 
-            ncell=self._ncell, mean_waveforms=self._mean_waveforms,
-            events=self._events, mouse=self._mouse, date=self._date)
+            probe_id=self._probe_id, metrics=self._metrics,
+            events=self._events, mouse_name=self._mouse_name, unit_locs=self._unit_locs,
+            chan_locs=self._chan_locs, chan_probe_id=self._chan_probe_id)
 
-    def load_units(self, fpath):
-        pass
+    def load_units_npz(self, fpath):
+        d = np.load(fpath)
+        self._spike_times = d['spike_times']
+        self._clusts = d['clusts']
+        self._clust_id = d['clust_id']
+        self._clust_depths = d['clust_depths']
+        self._probe_id = d['probe_id']
+        self._metrics = d['metrics']
+        self._events = d['events']
+        self._mouse_name = d['mouse_name']
+        self._unit_locs = d['unit_locs']
+        self._chan_locs = d['chan_locs']
+        self._chan_probe_id = d['chan_probe_id']
 
     def rescale_lfps(self, lfps, sample_rates):
         """
