@@ -20,7 +20,7 @@ class MultiprobeData(object):
     Class used to load all the sorting results from a single experiment. 
     This assumes that Tprime has already been run and aligned event times are available. 
     """
-    def __init__(self, mouse, date, load_waveforms=False, load_lfp=True):
+    def __init__(self, mouse, date, load_waveforms=False, load_lfp=True, qc='bombcell'):
         self._expts = [] # list of probe paths
         self._ncell = 0
         self._spike_times = None # Nspikes x 1
@@ -47,6 +47,7 @@ class MultiprobeData(object):
 
         self._load_lfp = load_lfp
         self._load_waveforms = load_waveforms
+        self._qc = qc
         # experiment-specific event info
         self._events = None
 
@@ -76,7 +77,7 @@ class MultiprobeData(object):
             clust_offset: maximum number of possible clusters in each experiment, to uniquely identify clusters
         """
         for i, probe_path in enumerate(self._expts):
-            expt = EPhyClusts(self._expts[i], self._load_waveforms, load_lfp=self._load_lfp)
+            expt = EPhyClusts(self._expts[i], self._load_waveforms, load_lfp=self._load_lfp, qc=self._qc)
             self._chan_map.append(expt._chan_map)
             self._chan_pos.append(expt._chan_pos)
             self._winv.append(expt._winv)
@@ -187,9 +188,13 @@ class EPhyClusts(object):
     This class is used to process condense the Phy output into a single npy file.
     """
 
-    def __init__(self, dirname, load_waveforms=False, load_lfp=True):
+    def __init__(self, dirname, load_waveforms=False, load_lfp=True, qc='bombcell'):
         """
         :input dirname: name of kilosort output directory with Phy data
+        :input load_waveforms: whether to load the waveforms for each cluster.
+        :input load_lfp: whether to load the downsampled LFP data for this probe.
+        :input qc: whether to use the bombcell unittype file ('bombcell') or the kilosort unit type file ('ks')
+
 .
         """
         vals = {}
@@ -226,9 +231,13 @@ class EPhyClusts(object):
             self._metrics = pd.read_csv(os.path.join(dirname, "cluster_info.tsv"), sep="\t")
         else:
             self._metrics = pd.read_csv(os.path.join(dirname, "metrics.csv"))
-        _, self._noise, _ = self._load_cluster_types(dirname)
+        self._good, self._noise, self._mua = self._load_cluster_types(dirname, qc=qc)
         self._metrics["noise"] = np.zeros_like(self._metrics["cluster_id"])
+        self._metrics["good"] = np.zeros_like(self._metrics["cluster_id"])
+        self._metrics["mua"] = np.zeros_like(self._metrics["cluster_id"])
         self._metrics.loc[self._metrics["cluster_id"].isin(self._noise), "noise"] = 1
+        self._metrics.loc[self._metrics["cluster_id"].isin(self._good), "good"] = 1
+        self._metrics.loc[self._metrics["cluster_id"].isin(self._mua), "mua"] = 1
         self._clust_id = np.unique(self._metrics["cluster_id"])
         self._clust_depths = self._chan_pos[self._metrics["peak_channel"][np.argsort(self._metrics["cluster_id"])]][:,1]
         self._clust_xpos = self._chan_pos[self._metrics["peak_channel"][np.argsort(self._metrics["cluster_id"])]][:,0]
@@ -254,23 +263,43 @@ class EPhyClusts(object):
         lfp_data.close()
         return lfp_sub, chan_ix, fs/temporal_downsample
     
-    def _load_cluster_types(self, dirname):
+    def _load_cluster_types(self, dirname, qc='bombcell'):
         noise = []
         good = []
         mua = []
-        fname = os.path.join(dirname, "cluster_group.tsv")
-        with open(fname) as f:
-            for l in f:
-                fields = l.rstrip().split("\t")
-                if fields[0] == "cluster_id":
-                    pass
-                else:
-                    cluster_id = int(fields[0])
-                    cluster_type = fields[1]
-                    if cluster_type == "good":
-                        good.append(cluster_id)
-                    elif cluster_type == "mua":
-                        mua.append(cluster_id)
-                    elif cluster_type == "noise":
-                        noise.append(cluster_id)
+        if qc == 'bombcell':
+            fname = os.path.join(dirname, "cluster_bc_unitType.tsv")
+            if not os.exists(fname):
+                raise ValueError('No bombcell qc file!')
+            with open(fname) as f:
+                for l in f:
+                    fields = l.rstrip().split("\t")
+                    if fields[0] == "cluster_id":
+                        pass
+                    else:
+                        cluster_id = int(fields[0])
+                        cluster_type = fields[1]
+                        if cluster_type == "GOOD":
+                            good.append(cluster_id)
+                        elif (cluster_type == "MUA") or (cluster_type == "NON-SOMA"):
+                            mua.append(cluster_id)
+                        elif cluster_type == "NOISE":
+                            noise.append(cluster_id)
+
+        else:
+            fname = os.path.join(dirname, "cluster_group.tsv")
+            with open(fname) as f:
+                for l in f:
+                    fields = l.rstrip().split("\t")
+                    if fields[0] == "cluster_id":
+                        pass
+                    else:
+                        cluster_id = int(fields[0])
+                        cluster_type = fields[1]
+                        if cluster_type == "good":
+                            good.append(cluster_id)
+                        elif cluster_type == "mua":
+                            mua.append(cluster_id)
+                        elif cluster_type == "noise":
+                            noise.append(cluster_id)
         return np.array(good), np.array(noise), np.array(mua)

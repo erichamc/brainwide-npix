@@ -105,9 +105,13 @@ class MultiprobeEphysExperiment(object):
         self.get_good_units()
 
 
-    def get_good_units(self, isi_viol=0.1, snr=1.5, nspikes=500, noise=0):
+    def get_good_units(self, isi_viol=0.1, snr=1.5, nspikes=500, noise=0, qc='bombcell'):
         m = self._metrics
-        mask = (m["isi_viol"]<isi_viol) & (m["snr"]>=1.5) & (m["n_spikes"]>nspikes) & (m["noise"]==noise)
+        if qc=='bombcell':
+            good_annot = m["good"].astype('bool')
+        else:
+            good_annot = m["noise"]==noise
+        mask = (m["isi_viol"]<isi_viol) & (m["snr"]>=1.5) & (m["n_spikes"]>nspikes) & good_annot
         self._good = np.unique(m[mask]["cluster_id"])
         self._ncell = len(self._good)
         self._good_mask = mask
@@ -282,7 +286,7 @@ class MultiprobeEphysExperiment(object):
             raise NotImplementedError
             #sorted_idx = np.argsort(self._clust_depths[self._clust_groups==1])
         elif clust_type == "good":
-            sorted_idx = np.argsort(self._clust_depths[self._good==2])
+            sorted_idx = np.argsort(self._clust_depths[self._good])
         return self._clust_id[sorted_idx], sorted_idx
     
     def depth_sort_probe(self, probe):
