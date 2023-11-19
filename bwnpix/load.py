@@ -269,7 +269,7 @@ class EPhyClusts(object):
         mua = []
         if qc == 'bombcell':
             fname = os.path.join(dirname, "cluster_bc_unitType.tsv")
-            if not os.exists(fname):
+            if not os.path.exists(fname):
                 raise ValueError('No bombcell qc file!')
             with open(fname) as f:
                 for l in f:
