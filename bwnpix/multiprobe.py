@@ -64,7 +64,7 @@ class MultiprobeEphysExperiment(object):
         else:
             print('Path not found: %s' % fname )
 
-    def load_units_from_ks(self, fpath, verbose=True, load_lfp=False):
+    def load_units_from_ks(self, fpath, verbose=True, load_lfp=False, metrics_keys=None, qc='bombcell'):
         """
         Load units from numpy array, then compute firing rates.
         NOTE: The KS data should have been aligned to sync events, so we can
@@ -72,16 +72,29 @@ class MultiprobeEphysExperiment(object):
         """
         if ".npz" in fpath:
             data = np.load(fpath, allow_pickle=True)
+            self._spike_times = data["spike_times"]
+            self._clusts = data["clusts"]
+            self._clust_id = data["clust_id"]
+            self._clust_depths = data["clust_depths"]
+            self._probe_id = data["probe_id"]
+            self._events = data["events"]
+            self._ntot = None
+            if metrics_keys is None:
+                self._metrics = data["metrics"]
+            else:
+                self._metrics = pd.DataFrame(data["metrics"], columns=metrics_keys)
+
         else:
             with open(fpath, 'rb') as f:
                 data = pickle.load(f)
-        
-        self._spike_times = data._spike_times
-        self._clusts = data._clusts
-        self._clust_id = data._clust_id
-        self._clust_depths = data._clust_depths
-        self._probe_id = data._probe_id
-        self._metrics = data._metrics
+            self._spike_times = data._spike_times
+            self._clusts = data._clusts
+            self._clust_id = data._clust_id
+            self._clust_depths = data._clust_depths
+            self._probe_id = data._probe_id
+            self._metrics = data._metrics
+            self._events = data._events
+            self._ntot = data._ncell
 
         if load_lfp:
             self._lfp = data._lfp
@@ -97,12 +110,9 @@ class MultiprobeEphysExperiment(object):
         # convenience data for performant spike extraction
         self.__clusts_argsorted = np.argsort(self._clusts)
         self.__clusts_sorted = self._clusts[self.__clusts_argsorted]
-        # event sync data
-        self._events = data._events
 
-        self._ntot = data._ncell
         self._max_t = self._spike_times.max()
-        self.get_good_units()
+        self.get_good_units(qc=qc)
 
 
     def get_good_units(self, isi_viol=0.1, snr=1.5, nspikes=500, noise=0, qc='bombcell'):
